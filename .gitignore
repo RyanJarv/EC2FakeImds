@@ -1,0 +1,6 @@
+.terraform/
+crash.log
+terraform.tfvars
+terraform.tfstate
+terraform.tfstate.backup
+**/.aws-sam/
