@@ -64,7 +64,7 @@
       "instancesSet": {
         "items": [
           {
-            "instanceId": "i-08d36cd1d3249b462",
+            "instanceId": "i-0bbcc08a3ceaa8e28",
             "imageId": "ami-0b0f4c27376f8aa79",
             "instanceState": {
               "code": 0,
@@ -82,8 +82,8 @@
             "monitoring": {
               "state": "disabled"
             },
-            "subnetId": "subnet-de7d97b5",
-            "vpcId": "vpc-4b30f220",
+            "subnetId": "subnet-4bd63d16",
+            "vpcId": "vpc-fc407486",
             "privateIpAddress": "172.31.4.173",
             "stateReason": {
               "code": "pending",
@@ -109,8 +109,8 @@
               "items": [
                 {
                   "networkInterfaceId": "eni-05b7863af7a6d1fa3",
-                  "subnetId": "subnet-de7d97b5",
-                  "vpcId": "vpc-4b30f220",
+                  "subnetId": "subnet-4bd63d16",
+                  "vpcId": "vpc-fc407486",
                   "ownerId": "253528964770",
                   "status": "in-use",
                   "macAddress": "02:79:26:d0:3c:c2",

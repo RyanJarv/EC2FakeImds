@@ -10,6 +10,17 @@ Globals:
   Function:
     Timeout: 5
 
+#Parameters:
+#  FakeImdsInstanceId:
+#    Type: String
+#    Description: The instance id of the fake imds server.
+#  ActiveVpc:
+#    Type: String
+#    Description: VPC's to operate in, it should be the same VPC the fake IMDS instance resides in.
+#  ActiveSubnets:
+#    Type: CommaDelimitedList
+#    Description: List of Subnets to operate on, they should exist in ActiveVpc and exclude the subnet the fake imds resides in.
+
 Resources:
   FakeImdsRouteFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
@@ -32,8 +43,7 @@ Resources:
                   - "RunInstances"
       Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
         Variables:
-          ActiveSubnets: "subnet-1e677f79"
-          ActiveVpc: "vpc-fc407486"
+          FakeImdsInstanceId: "i-047ff7ceff77ff0d5"
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
