@@ -1,0 +1,39 @@
+#cloud-config
+
+bootcmd:
+ - echo HELLO FROM USER DATA SCRIPT | tee /msg > /dev/kmsg
+ - apt-get update 
+ - apt-get install -y awscli
+
+ # fyi. this script works but hasn't been tested in user data yet.. so yaml/cloud-init issues beware
+ - |-
+    set -eu
+
+    # metadata returned at this point will be from the fake imds server.
+    # we could potentially remove the hardcoded keys while making sure to specify the region, but I haven't tested that yet.
+    export AWS_DEFAULT_REGION="<your region>"
+    export AWS_SECRET_ACCESS_KEY="<your hardcoded secret access key here>"
+    export AWS_ACCESS_KEY_ID="<your hardcoded access id here>"
+
+    # Format of the results:
+    #   operation per line
+    #   disassociate:<assoicationId>:<tmpRouteTable>  -- disassociate assoicationId and delete tmpRouteTable
+    #   <origTableId>:<assoicationId>:<tmpRouteTable>  -- replace assoicationId with origTableId and delete tmpRouteTable
+    results="$(aws ec2 describe-route-tables --filter "Name=tag-key,Values=OrigRouteTableId" |jq -r '.RouteTables|.[].Tags|.[]| select(.Key == "OrigRouteTableId")|.Value'|uniq)"
+
+    echo "$results" | while read line; do
+      origTableId="$(echo "$line"|cut -d: -f 1)";
+      assoicationId="$(echo "$line"|cut -d: -f 2)";
+      tmpRouteTable="$(echo "$line"|cut -d: -f 3)";
+
+      echo "origTableId: ${origTableId}, assoicationId: ${assoicationId}, tmpRouteTable: ${tmpRouteTable}" 
+
+      if [ "x$origTableId" == "xdisassociate" ]; then
+        aws ec2 disassociate-route-table --association-id "$assoicationId" 
+      else
+        aws ec2 replace-route-table-association --association-id "$assoicationId" --route-table-id "$origTableId"
+      fi
+
+      aws ec2 delete-route-table --route-table-id "$tmpRouteTable"
+    done
+ - cloud-init clean && reboot

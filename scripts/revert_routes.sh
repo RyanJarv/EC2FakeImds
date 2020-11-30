@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+#
+# This file is included in the user data returned from the fake imds server, however a copy is kept here for testing, they should be the same though.
+#
 set -eu
 
 # Format of the results:
