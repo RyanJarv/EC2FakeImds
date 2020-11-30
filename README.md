@@ -20,7 +20,18 @@ SAM lambda function that runs when a the RunInstance API is called. It should be
 
 WIP Note: Currently you need to update the parameters in the sam config template to the appropriate values.
 
-Originally I simply added and removed a hardcoded 169.254.169.254/32, this script attempts to work in any setup by making a back up of the route table(s) that the new instance uses as well as the fake IMDS server, attaching the former to the subnet the new instance is running in and injecting a static route of 169.254.169.254/32 pointing to the fake IMDS server. Thinking about this again though I suppose I only need to do this for the new instance, not the IMDS server as well. The main thing is the IMDS server's route isn't affected, however we ignore any RunInstance commands in the same subnet of the fake IMDS server for this reason.
+Originally I simply added and removed a hardcoded 169.254.169.254/32, this script attempts to work in any setup by making a back up of the route table(s) that the new instance uses as well as the fake IMDS server, attaching the former to the subnet the new instance is running in and injecting a static route of 169.254.169.254/32 pointing to the fake IMDS server.
+
+Thinking about this again though I suppose I only need to do this for the new instance, not the IMDS server as well. The main thing is the IMDS server's route isn't affected, however we ignore any RunInstance commands in the same subnet of the fake IMDS server for this reason.
+
+### User Data
+
+This is actually served as apart of the Fake IMDS Instance nginx root directory. There's enough interesting stuff in the [user-data](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data) for it to warrent it's own section though.
+
+When we get to the point that the victims node is executing the user-data we can [Revert the routes](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L9) and then [re-init cloud-init and reboot](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L39).
+
+Of course our malicous script is executed somewhere [at the top](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L4).
+
 
 ### Terraform
 
