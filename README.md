@@ -51,12 +51,36 @@ upstream imds {
 }
 ```
 
-So we have our own IMDS serving *mock* (for lack of a better term) responses when it's not caught first by the filesystem. The main reason we do this is because we need cloud-init to get far enough in the cycle that it executes our custom user-data, so we just send our bogus responses hoping it doesn't screw anything up. We actually do have to block a few things and return empty responses, mostly relating to networking or else the victim's instance will get confused. If you see any blank index files in the directory structure, that's what's going on there.
+So we have our own IMDS serving *mock* responses when it's not caught first by the filesystem. We do this is because cloud-init need's to get far enough in the cycle that it executes our custom user-data. We just send our semi-bogus responses hoping it doesn't screw anything up.
 
-This of course would be unacceptable in any real application to do something like this, but in reality an attacker isn't going to care that they are serving out keys or what not to anyone inside the VPC that asks.
+We do have to block a few things, mostly relating to networking, otherwise the the victim's instance will get confused. If you see any blank index files in the directory structure, that's what's going on there.
 
-Right now the [user data](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data) just uses the hardcoded keys, but if the instance had the right permissions we need here we could potentially just omit the creds there. The victim instance should be using the fake IMDS instance profile at this point in the boot process (should, haven't tested this).
+All this would of course would be unacceptable in any real application.. just opening up your real IMDS to the world (or vpc in our case), but in reality an attacker isn't really going to care about that kind of thing. It's not really their data they are losing (or maybe it is now.. lol).
 
-We do some interesting stuff with iptables in the fake IMDS [startup script](https://github.com/RyanJarv/EC2FakeImds/blob/main/main.tf#L52) to get all this routing to work both ways. We serve traffic sent to us intended to 169.254.169.254 (remember we're behaving as the next hop in the routing table) by listening on 169.254.168.254 (third octect 168 vs 169), while still being able to use the nodes real IMDS like normal. This is essential for mocking out the parts of the IMDS service we don't care about.
+Right now the [user data](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data) just uses the hardcoded keys, but if the instance had the right permissions we need here we could potentially just omit the creds there. The victim instance should be using the fake IMDS's instance profile at this point in the boot process (should, but haven't tested this).
+
+We also do some interesting stuff with iptables in the fake IMDS [startup script](https://github.com/RyanJarv/EC2FakeImds/blob/main/main.tf#L52) in order to get routing to work here. We serve traffic sent to us intended to 169.254.169.254 (remember we're behaving as the next hop in the routing table) by listening on 169.254.168.254 (third octect 168 vs 169), while still being able to use the nodes real IMDS like normal. This is essential for mocking out the parts of the IMDS service we don't care about.
+
+So we add the IMDS IP
+```
+ip addr add 169.254.168.254/32 dev eth0
+```
+
+Short circuit outbound routing to the IMDS ip in the NAT table. This allows us to talk to our real IMDS server. (NOTE: Just realized I need to unhardcode the instances private IP here, or figure out a better way to do this).
+```
+iptables -t nat -A PREROUTING -s 169.254.168.254,172.31.54.46 -d 169.254.169.254/32 -j RETURN
+```
+
+All other traffic to the IMDS IP is DNAT'd to our nginx server listening on `169.254.168.254`.
+```
+iptables -t nat -A PREROUTING -d 169.254.169.254/32 -j DNAT --to-destination 169.254.168.254
+```
+
+Then we MASQUERADE outbound traffic coming from nginx listening on 169.254.168.254. This is needed for our nginx server to make requests to our real IMDS, 169.254.168.254 isn't really routable to us, either that or the real IMDS server doesn't like seeing traffic coming from it.
+```
+iptables -t nat -A POSTROUTING -s 169.254.168.254 -d 169.254.169.254/32 -o eth0 -j MASQUERADE
+```
+
+Thinking over some of the iptables stuff here, I'm thinking it could be much simpler.. I guess this is just the first thing that worked for me so I kept it, something like that.
  
 
