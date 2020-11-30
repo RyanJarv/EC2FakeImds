@@ -30,7 +30,7 @@ This is actually served as apart of the Fake IMDS Instance nginx root directory.
 
 When we get to the point that the victims node is executing the user-data we can [Revert the routes](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L9) and then [re-init cloud-init and reboot](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L39).
 
-Of course our malicous script is executed somewhere [at the top](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L4).
+Of course our malicous script is executed (as root) somewhere [at the top](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L4).
 
 
 ### Terraform
