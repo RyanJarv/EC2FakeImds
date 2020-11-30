@@ -74,7 +74,7 @@ Right now the [user data](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds
 
 We also do some interesting stuff with iptables in the fake IMDS [startup script](https://github.com/RyanJarv/EC2FakeImds/blob/main/main.tf#L52) in order to get routing to work here. We serve traffic sent to us intended to 169.254.169.254 (remember we're behaving as the next hop in the routing table) by listening on 169.254.168.254 (third octect 168 vs 169), while still being able to use the nodes real IMDS like normal. This is essential for mocking out the parts of the IMDS service we don't care about.
 
-So we add the IMDS IP:
+So we add the IP the nginx server should listen on:
 ```
 ip addr add 169.254.168.254/32 dev eth0
 ```
