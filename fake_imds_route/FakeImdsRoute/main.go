@@ -70,13 +70,13 @@ func CopyTableToSubnet(ctx context.Context, subnetId, vpcId string) *types.Route
 		}
 	}
 
-	// Note: NewImdsRouteTable adds a tag of the old table that is used to revert later. In the case that we
-	// end up with the vpc route table it will just become a explicit association when we revert. Reverting
-	// isn't done in this code base but in the user-data served to the client.
+	// Note: NewImdsRouteTable adds a tag of the old table that is used to revert later.
 	newImdsTable := NewImdsRouteTable(ctx, oldImdsTable)
 	if association := GetAssociationId(oldImdsTable, subnetId); association == nil {
-		AttachTable(ctx, newImdsTable, subnetId)
+		newAssociation := AttachTable(ctx, newImdsTable, subnetId)
+		AddMetaTags(ctx, newAssociation, oldImdsTable, newImdsTable, true)
 	} else {
+		AddMetaTags(ctx, association.RouteTableAssociationId, oldImdsTable, newImdsTable, false)
 		SwapTables(ctx, association.RouteTableAssociationId, newImdsTable)
 	}
 
@@ -110,7 +110,6 @@ func GetVpcFromSubnet(ctx context.Context, vpcId string) *types.RouteTable {
 func NewImdsRouteTable(ctx context.Context, oldImdsTable *types.RouteTable) *types.RouteTable {
 	newImdsTable := CopyRoutes(ctx, oldImdsTable)
 	CopyTags(ctx, oldImdsTable, newImdsTable)
-	AddMetaTags(ctx, oldImdsTable, newImdsTable)
 	return newImdsTable
 }
 
@@ -135,13 +134,14 @@ func GetSubnetFromInstance(ctx context.Context, instanceId string) (subnet *type
 	return subnet
 }
 
-func AttachTable(ctx context.Context, table *types.RouteTable, subnetId string) {
-	_, err := client.AssociateRouteTable(ctx, &ec2.AssociateRouteTableInput{
+func AttachTable(ctx context.Context, table *types.RouteTable, subnetId string) *string {
+	out, err := client.AssociateRouteTable(ctx, &ec2.AssociateRouteTableInput{
 		RouteTableId: table.RouteTableId,
 		SubnetId:     aws.String(subnetId),
 	}); if err != nil {
 		panic(err)
 	}
+	return out.AssociationId
 }
 
 func SwapTables(ctx context.Context, associationId *string, table *types.RouteTable) {
@@ -153,16 +153,28 @@ func SwapTables(ctx context.Context, associationId *string, table *types.RouteTa
 	}
 }
 
-// AddMetaTags allows us to switch back to the original table later
-func AddMetaTags(ctx context.Context, origTable *types.RouteTable, tmpTable *types.RouteTable) {
+// AddMetaTags adds the original routeTableId and associationId as a tag to the new table so we can
+// easily revert later via the AWS cli in the user-data served from the fake IMDS server.
+//
+// The delete parameter indicates that the cleanup script (user-data from imds) should simply remove
+// the association, which will cause the subnet to fall back implicitly to the VPC's main table.
+func AddMetaTags(ctx context.Context, assoicationId *string, origTable, newTable *types.RouteTable, delete bool) {
+	tags := types.Tag{
+		Key: aws.String(OrigRouteTableId),
+	}
+
+	// These tags are for the cli script that references this.
+	if delete {
+		// Indicates the association should be disassociated
+		tags.Value = aws.String(fmt.Sprintf("disassociate:%s:%s", *assoicationId, *newTable.RouteTableId))
+	} else {
+		// Indicates the route table should be swapped using the given association
+		tags.Value = aws.String(fmt.Sprintf("%s:%s:%s", *origTable.RouteTableId, *assoicationId, *newTable.RouteTableId))
+	}
+
 	if _, err := client.CreateTags(ctx, &ec2.CreateTagsInput{
-		Resources: []*string{tmpTable.RouteTableId},
-		Tags: []*types.Tag{
-			{
-				Key:   aws.String(OrigRouteTableId),
-				Value: origTable.RouteTableId,
-			},
-		},
+		Resources: []*string{newTable.RouteTableId},
+		Tags:      []*types.Tag{&tags},
 	}); err != nil {
 		panic(err)
 	}
