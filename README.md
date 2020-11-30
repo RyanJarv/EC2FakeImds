@@ -1,5 +1,8 @@
 # EC2FakeImds (WIP)
 
+NOTE: This is a work in progress, and may or may not work for you. I've tried to make notes where pieces are missing or untested however.
+
+
 For more info see https://blog.ryanjarv.sh/2020/10/19/imds-persistence.html.
 
 Originally I made a very hacky PoC for this in one of my accounts. It works well enough but everything was hardcoded and only would work in a single VPC in my account. This repo is an attempt to make that PoC a bit more generic so that anyone can dig into it and get a better idea of how it works.
