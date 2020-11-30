@@ -22,9 +22,9 @@ WIP Note: Currently you need to update the parameters in the sam config template
 
 Originally I simply added and removed a hardcoded 169.254.169.254/32, this script attempts to work in any setup by making a back up of the route table(s) that the new instance uses as well as the fake IMDS server, attaching the former to the subnet the new instance is running in and injecting a static route of 169.254.169.254/32 pointing to the fake IMDS server. Thinking about this again though I suppose I only need to do this for the new instance, not the IMDS server as well. The main thing is the IMDS server's route isn't affected, however we ignore any RunInstance commands in the same subnet of the fake IMDS server for this reason.
 
-### terraform
+### Terraform
 
-This just spins up a instance to act as the fake IMDS server. This server has source/dest checking disabled since the static route we inject is essentially treating this instance as a gateway.
+This just spins up a instance to act as the fake IMDS server. This server has source/dest checking disabled since the static route we inject is essentially treating this instance as a gateway. It also run's a start up script which I go over in the [Fake IMDS Instance](#Fake-IMDS-Instance) section.
 
 ### Fake IMDS Instance
 
