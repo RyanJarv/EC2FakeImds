@@ -53,7 +53,7 @@ upstream imds {
 }
 ```
 
-So we have our own IMDS serving *mock* responses when it's not caught first by the filesystem. We do this is because cloud-init need's to get far enough in the cycle that it executes our custom user-data. We just send our semi-bogus responses hoping it doesn't screw anything up.
+So we have our own IMDS serving *mock* responses when it's not caught first by the filesystem. We do this is because cloud-init need's to get far enough in the cycle that it executes our custom user-data. We just send our semi-bogus responses hoping it doesn't screw anything up. In the case it does, we attempt to stop cloud-init from enumerating those resources by responding with nothing (i.e the blank files mentioned earlier).
 
 We do have to block a few things, mostly relating to networking, otherwise the the victim's instance will get confused. If you see any blank index files in the directory structure, that's what's going on there.
 
