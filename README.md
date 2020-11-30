@@ -55,7 +55,7 @@ upstream imds {
 
 So we have our own IMDS serving *mock* responses when it's not caught first by the filesystem. We do this is because cloud-init need's to get far enough in the cycle that it executes our custom user-data. We just send our semi-bogus responses hoping it doesn't screw anything up. In the case it does, we attempt to stop cloud-init from enumerating those resources by responding with nothing (i.e the blank files mentioned earlier).
 
-We do have to block a few things, mostly relating to networking, otherwise the the victim's instance will get confused. If you see any blank index files in the directory structure, that's what's going on there.
+The paths we need to block are mostly relate to networking, they don't seem necessary for our purposes in the boot process and everything will be re-inited with the right IMDS server later anyways. FYI the re-init process triggered in our [user-data script](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L39) just after we set the routes back to default in the same script.
 
 All this would of course would be unacceptable in any real application.. just opening up your real IMDS to the world (or vpc in our case), but in reality an attacker isn't really going to care about that kind of thing. It's not really their data they are losing (or maybe it is now.. lol).
 
