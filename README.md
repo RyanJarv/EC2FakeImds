@@ -30,13 +30,15 @@ This just spins up a instance to act as the fake IMDS server. This server has so
 
 Note: All this config is in the repo but not deployed to the instance currently. Needs to be manually copied if you want to test this at the moment. You can find the nginx config and web directory under [./imds](https://github.com/RyanJarv/EC2FakeImds/tree/main/imds)
 
-This is a strange setup but it seems to work so far. First we have nginx rewriting any first part of the path to /latest since cloud-init sometimes want's specific versions, so we do this to prevent maintaining multiple directory structures of the same config.
+This is a strange setup but it seems to work so far.
+
+First we have nginx rewriting any first part of the path to /latest since cloud-init sometimes want's specific versions, so we do this to prevent maintaining multiple directory structures of the same config.
 
 ```
 rewrite ^/(.+?)/(.+)$ /latest/$2 last;
 ```
 
-Next we attempt to serve from the imds folder.
+Next we attempt to serve from the [imds folder](https://github.com/RyanJarv/EC2FakeImds/tree/main/imds).
 
 ```
 root /var/www/imds;
