@@ -28,7 +28,7 @@ This just spins up a instance to act as the fake IMDS server. This server has so
 
 ### Fake IMDS Instance
 
-Note: All this config is in the repo but not deployed to the instance currently. Needs to be manually copied if you want to test this at the moment. You can find the nginx config and web directory under [./imds](https://github.com/RyanJarv/EC2FakeImds/tree/main/imds)
+Note: All this config is in the repo but not deployed to the instance currently. Needs to be manually copied if you want to test this at the moment. You can find the nginx config and web directory under [./imds](https://github.com/RyanJarv/EC2FakeImds/tree/main/imds).
 
 This is a strange setup but it seems to work so far.
 
@@ -38,7 +38,7 @@ First we have nginx rewriting any first part of the path to /latest since cloud-
 rewrite ^/(.+?)/(.+)$ /latest/$2 last;
 ```
 
-Next we attempt to serve from the [imds folder](https://github.com/RyanJarv/EC2FakeImds/tree/main/imds).
+Next we attempt to serve from the [imds folder](https://github.com/RyanJarv/EC2FakeImds/tree/main/imds). You'll notice that the directory is almost entirely blank files, we'll go into that a bit more below.
 
 ```
 root /var/www/imds;
