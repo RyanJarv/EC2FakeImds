@@ -2,16 +2,17 @@
 
 NOTE: This is a work in progress, and may or may not work for you. I've tried to make notes where pieces are missing or untested however.
 
+## Overview
 
-For more info see https://blog.ryanjarv.sh/2020/10/19/imds-persistence.html.
+For a very high level overview of the issue I'm attempting to demonstrate here you can see my blog post on [AWS IMDS Persistence/Priv Escalation](https://blog.ryanjarv.sh/2020/10/19/imds-persistence.html)
 
-Originally I made a very hacky PoC for this in one of my accounts. It works well enough but everything was hardcoded and only would work in a single VPC in my account. This repo is an attempt to make that PoC a bit more generic so that anyone can dig into it and get a better idea of how it works.
+The backstory of this though is I made a very hacky PoC for this in one of my accounts. It works well enough but everything was hardcoded and only would work in a single VPC in my account. So this repo is an attempt to make that PoC a bit more generic so that anyone can dig into it and get a better idea of how it works.
 
 If you are looking for a way to detect this kind of activity you can check out the [NonDefaultMetadataServer](https://github.com/RyanJarv/awsconfig#nondefaultmetadataserverg) config check I made for this. It hasn't had extensive use yet, but it seems to work well enough in my testing (just remember to set up an alert after configuring it).
 
-## Setup
+## Details
 
-Since this is still a work in progress there some glue tying a few of the things together right now.
+Since this is still a work in progress there some glue tying a few of the things together right now. Instead of a howto, I'll just go over each of the parts as much as I can for now.
 
 ### fake_imds_route
 
