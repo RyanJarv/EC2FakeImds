@@ -76,8 +76,8 @@ func CopyTableToSubnet(ctx context.Context, subnetId, vpcId string) *types.Route
 		newAssociation := AttachTable(ctx, newImdsTable, subnetId)
 		AddMetaTags(ctx, newAssociation, oldImdsTable, newImdsTable, true)
 	} else {
-		AddMetaTags(ctx, association.RouteTableAssociationId, oldImdsTable, newImdsTable, false)
-		SwapTables(ctx, association.RouteTableAssociationId, newImdsTable)
+		newAssociation := SwapTables(ctx, association.RouteTableAssociationId, newImdsTable)
+		AddMetaTags(ctx, newAssociation, oldImdsTable, newImdsTable, false)
 	}
 
 	return newImdsTable
@@ -144,13 +144,14 @@ func AttachTable(ctx context.Context, table *types.RouteTable, subnetId string) 
 	return out.AssociationId
 }
 
-func SwapTables(ctx context.Context, associationId *string, table *types.RouteTable) {
-	_, err := client.ReplaceRouteTableAssociation(ctx, &ec2.ReplaceRouteTableAssociationInput{
+func SwapTables(ctx context.Context, associationId *string, table *types.RouteTable) *string {
+	out, err := client.ReplaceRouteTableAssociation(ctx, &ec2.ReplaceRouteTableAssociationInput{
 		RouteTableId: table.RouteTableId,
 		AssociationId: associationId,
 	}); if err != nil {
 		panic(err)
 	}
+	return out.NewAssociationId
 }
 
 // AddMetaTags adds the original routeTableId and associationId as a tag to the new table so we can
