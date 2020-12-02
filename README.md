@@ -1,6 +1,6 @@
 # EC2FakeImds (WIP)
 
-NOTE: This is a work in progress, and may or may not work for you. I've tried to make notes where pieces are missing or untested however.
+NOTE: This is a work in progress, and may or may not work for you. I've tried to make notes where pieces are missing or untested however. The overall process however has been tested and works as expected.
 
 ## Alternatives
 
