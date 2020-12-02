@@ -4,7 +4,7 @@ NOTE: This is a work in progress, and may or may not work for you. I've tried to
 
 ## Alternatives
 
-If you are able to change instance attributes for an instance the  [UserDataSwap](https://github.com/RyanJarv/UserDataSwap) is likely a better choice. It does the same thing effectively. The main reason for this PoC is to prove you can sere your own user data with primarly NetworkAdmin permissions, without any permission's to the victim EC2 instance. There are a few other benefits to this approach as well but they are mostly outweighed by complexity of the set up (compared to [UserDataSwap](https://github.com/RyanJarv/UserDataSwap)) and the fact you need to have full permissions to at least one node in the VPC. There are likely alternaties to the last requirement, so in general I'd simply recommend monitoring for any route changes involving 169.254.169.254/32 (see the [overview](#Overview) section more info).
+If you are able to change instance attributes for an instance the  [UserDataSwap](https://github.com/RyanJarv/UserDataSwap) is likely a better choice. It does the same thing effectively. The main reason for this PoC is to prove you can serve your own user data with primarly NetworkAdmin permissions, without any permission's to the victim EC2 instance. There are a few other benefits to this approach as well but they are mostly outweighed by complexity of the set up (compared to [UserDataSwap](https://github.com/RyanJarv/UserDataSwap)) and the fact you need to have full permissions to at least one node in the VPC. There are likely alternaties to the last requirement, so in general I'd simply recommend monitoring for any route changes involving 169.254.169.254/32 (see the [overview](#Overview) section more info).
 
 ## Overview
 
