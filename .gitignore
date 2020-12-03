@@ -6,3 +6,4 @@ terraform.tfstate
 terraform.tfstate.backup
 **/.aws-sam/
 **/samconfig.toml
+.terraform.tfstate.lock.info
