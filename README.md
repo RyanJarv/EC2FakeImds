@@ -1,6 +1,17 @@
 # EC2FakeImds (WIP)
 
-NOTE: This is a work in progress, and may or may not work for you. I've tried to make notes where pieces are missing or untested however. The overall process however has been tested and works as expected.
+## Warning
+Don't run this in an account you or anyone else actively uses.
+
+## Setup
+
+```
+% terraform apply
+% cd fake_imds_route
+% make init
+```
+
+Launch an instance in any zone accept the one used for the fake IMDS server (us-east-1f unless changed) and it should come up with the /msg file created by the fake metadata server.
 
 ## Alternatives
 

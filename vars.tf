@@ -30,3 +30,8 @@ variable "attacker_subnet_id" {
 
 EOH
 }
+
+variable "fake_imds_ami" {
+  default = "ami-0885b1f6bd170450c" // Ubuntu 20.04
+  description = "AMI to use for the fake imds instance"
+}
