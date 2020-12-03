@@ -13,7 +13,9 @@ Don't run this in an account you or anyone else actively uses.
 
 Launch an instance in any zone accept the one used for the fake IMDS server (us-east-1f unless changed) and it should come up with the /msg file created by the fake metadata server.
 
-Note: At the moment this takes a *really* long time to boot up the instance. Something is defenitly wrong here, I don't have time to look into it at the moment but for reference it should be possible to get it to switch back the routes in under 30 seconds, adding about a minute to the boot time total.
+## Debugging
+
+If it's taking a really long time to boot up the instance (more then a few minutes), and the routes arn't reverting, something in the user data on the IMDS instance is likely breaking. You can wait 20 minutes or so and the instance should come up, at that point you can test the user-data being served by the Fake IMDS server by running `cloud-init clean` and `cloud-init init`. You'll have to log in to the IMDS server though to edit it since it pulls it from their each time.
 
 ## Alternatives
 
