@@ -30,11 +30,11 @@ Thinking about this again though I suppose I only need to do this for the new in
 
 ### User Data
 
-This is actually served as apart of the Fake IMDS Instance nginx root directory. There's enough interesting stuff in the [user-data](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data) for it to warrent it's own section though.
+This is actually served as apart of the Fake IMDS Instance nginx root directory. There's enough interesting stuff in the [user-data](https://github.com/RyanJarv/EC2FakeImds/blob/main/files/imds/latest/user-data) for it to warrent it's own section though.
 
-When we get to the point that the victims node is executing the user-data we can [Revert the routes](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L9) and then [re-init cloud-init and reboot](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L39).
+When we get to the point that the victims node is executing the user-data we can [Revert the routes](https://github.com/RyanJarv/EC2FakeImds/blob/main/files/imds/latest/user-data#L9) and then [re-init cloud-init and reboot](https://github.com/RyanJarv/EC2FakeImds/blob/main/files/imds/latest/user-data#L39).
 
-Of course our malicous script is executed (as root) somewhere [at the top](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L4).
+Of course our malicous script is executed (as root) somewhere [at the top](https://github.com/RyanJarv/EC2FakeImds/blob/main/files/imds/latest/user-data#L4).
 
 
 ### Terraform
@@ -43,7 +43,7 @@ This just spins up a instance to act as the fake IMDS server. This server has so
 
 ### Fake IMDS Instance
 
-Note: All this config is in the repo but not deployed to the instance currently. Needs to be manually copied if you want to test this at the moment. You can find the nginx config and web directory under [./imds](https://github.com/RyanJarv/EC2FakeImds/tree/main/imds).
+You can find the nginx config and web directory under [./imds](https://github.com/RyanJarv/EC2FakeImds/tree/main/files/imds). This is deployed to the instance using terraform provisioners.
 
 This is a strange setup but it seems to work so far.
 
@@ -53,7 +53,7 @@ First we have nginx rewriting any first part of the path to /latest since cloud-
 rewrite ^/(.+?)/(.+)$ /latest/$2 last;
 ```
 
-Next we attempt to serve from the [imds folder](https://github.com/RyanJarv/EC2FakeImds/tree/main/imds). You'll notice that the directory is almost entirely blank files, we'll go into that a bit more below.
+Next we attempt to serve from the [imds folder](https://github.com/RyanJarv/EC2FakeImds/tree/main/files/imds). You'll notice that the directory is almost entirely blank files, we'll go into that a bit more below.
 
 ```
 root /var/www/imds;
@@ -70,13 +70,13 @@ upstream imds {
 
 So we have our own IMDS serving *mock* responses when it's not caught first by the filesystem. We do this is because cloud-init need's to get far enough in the cycle that it executes our custom user-data. We just send our semi-bogus responses hoping it doesn't screw anything up. In the case it does, we attempt to stop cloud-init from enumerating those resources by responding with nothing (i.e the blank files mentioned earlier).
 
-The paths we need to block are mostly relate to networking, they don't seem necessary for our purposes in the boot process and everything will be re-inited with the right IMDS server later anyways. FYI the re-init process triggered in our [user-data script](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data#L39) just after we set the routes back to default in the same script.
+The paths we need to block are mostly relate to networking, they don't seem necessary for our purposes in the boot process and everything will be re-inited with the right IMDS server later anyways. FYI the re-init process triggered in our [user-data script](https://github.com/RyanJarv/EC2FakeImds/blob/main/files/imds/latest/user-data#L39) just after we set the routes back to default in the same script.
 
 All this would of course would be unacceptable in any real application.. just opening up your real IMDS to the world (or vpc in our case), but in reality an attacker isn't really going to care about that kind of thing. It's not really their data they are losing (or maybe it is now.. lol).
 
-Right now the [user data](https://github.com/RyanJarv/EC2FakeImds/blob/main/imds/latest/user-data) just uses the hardcoded keys, but if the instance had the right permissions we need here we could potentially just omit the creds there. The victim instance should be using the fake IMDS's instance profile at this point in the boot process (should, but haven't tested this).
+Right now the [user data](https://github.com/RyanJarv/EC2FakeImds/blob/main/files/imds/latest/user-data) just uses the hardcoded keys, but if the instance had the right permissions we need here we could potentially just omit the creds there. The victim instance should be using the fake IMDS's instance profile at this point in the boot process (should, but haven't tested this).
 
-We also do some interesting stuff with iptables in the fake IMDS [startup script](https://github.com/RyanJarv/EC2FakeImds/blob/main/main.tf#L52) in order to get routing to work here. We serve traffic sent to us intended to 169.254.169.254 (remember we're behaving as the next hop in the routing table) by listening on 169.254.168.254 (third octect 168 vs 169), while still being able to use the nodes real IMDS like normal. This is essential for mocking out the parts of the IMDS service we don't care about.
+We also do some interesting stuff with iptables in the fake IMDS [startup script](https://github.com/RyanJarv/EC2FakeImds/blob/scripts/nginx-imds.conf) in order to get routing to work here. We serve traffic sent to us intended to 169.254.169.254 (remember we're behaving as the next hop in the routing table) by listening on 169.254.168.254 (third octect 168 vs 169), while still being able to use the nodes real IMDS like normal. This is essential for mocking out the parts of the IMDS service we don't care about.
 
 So we add the IP the nginx server should listen on:
 ```
