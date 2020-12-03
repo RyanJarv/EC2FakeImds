@@ -13,6 +13,8 @@ Don't run this in an account you or anyone else actively uses.
 
 Launch an instance in any zone accept the one used for the fake IMDS server (us-east-1f unless changed) and it should come up with the /msg file created by the fake metadata server.
 
+Note: At the moment this takes a *really* long time to boot up the instance. Something is defenitly wrong here, I don't have time to look into it at the moment but for reference it should be possible to get it to switch back the routes in under 30 seconds, adding about a minute to the boot time total.
+
 ## Alternatives
 
 If you are able to change instance attributes for an instance the  [UserDataSwap](https://github.com/RyanJarv/UserDataSwap) is likely a better choice. It does the same thing effectively. The main reason for this PoC is to prove you can serve your own user data without any permission's to the victim EC2 instance. In the future I'd like to see if I can limit permissions to only what's in AWS's network admin policy.
