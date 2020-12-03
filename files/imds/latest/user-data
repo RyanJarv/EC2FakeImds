@@ -1,19 +1,16 @@
 #cloud-config
 
 bootcmd:
- - echo HELLO FROM FAKE META DATA SERVER | tee /msg > /dev/kmsg
+ - echo HELLO FROM USER DATA SCRIPT | tee /msg > /dev/kmsg
  - apt-get update 
- - apt-get install -y awscli
+ - apt-get install -y awscli jq
 
  # fyi. this script works but hasn't been tested in user data yet.. so yaml/cloud-init issues beware
  - |-
     set -eu
-
-    ## metadata returned at this point will be from the fake imds server.
-    ## we could potentially remove the hardcoded keys while making sure to specify the region, but I haven't tested that yet.
-    # export AWS_DEFAULT_REGION="<your region>"
-    # export AWS_SECRET_ACCESS_KEY="<your hardcoded secret access key here>"
-    # export AWS_ACCESS_KEY_ID="<your hardcoded access id here>"
+    
+    export AWS_REGION="$(curl 169.254.169.254/latest/meta-data/placement/region)"
+    export AWS_DEFAULT_REGION="$(curl 169.254.169.254/latest/meta-data/placement/region)"
 
     # Format of the results:
     #   operation per line
@@ -28,7 +25,7 @@ bootcmd:
 
       echo "origTableId: ${origTableId}, assoicationId: ${assoicationId}, tmpRouteTable: ${tmpRouteTable}" 
 
-      if [ "x$origTableId" == "xdisassociate" ]; then
+      if echo "$origTableId"| grep "disassociate"; then
         aws ec2 disassociate-route-table --association-id "$assoicationId" 
       else
         aws ec2 replace-route-table-association --association-id "$assoicationId" --route-table-id "$origTableId"

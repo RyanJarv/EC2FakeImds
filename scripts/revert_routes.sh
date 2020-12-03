@@ -4,6 +4,9 @@
 #
 set -eu
 
+export AWS_REGION="$(curl 169.254.169.254/latest/meta-data/placement/region)"
+export AWS_DEFAULT_REGION="$(curl 169.254.169.254/latest/meta-data/placement/region)"
+
 # Format of the results:
 #   operation per line
 #   disassociate:<assoicationId>:<tmpRouteTable>  -- disassociate assoicationId and delete tmpRouteTable
@@ -17,7 +20,7 @@ echo "$results" | while read line; do
 
   echo "origTableId: ${origTableId}, assoicationId: ${assoicationId}, tmpRouteTable: ${tmpRouteTable}" 
 
-  if [ "x$origTableId" == "xdisassociate" ]; then
+  if echo "$origTableId"| grep "disassociate"; then
     aws ec2 disassociate-route-table --association-id "$assoicationId" 
   else
     aws ec2 replace-route-table-association --association-id "$assoicationId" --route-table-id "$origTableId"
@@ -25,5 +28,3 @@ echo "$results" | while read line; do
 
   aws ec2 delete-route-table --route-table-id "$tmpRouteTable"
 done
-
-
