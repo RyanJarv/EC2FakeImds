@@ -10,7 +10,7 @@ deploy: build
 	sam deploy
 
 invoke: build
-	sam local invoke --event ./event.json FakeImdsRouteFunction
+	sam local invoke --parameter-overrides FakeImdsInstanceId=i-0cc2694011b44b5e1 --event ./event.json
 
 debug-build:
 	cd FakeImdsRoute; GOOS=linux GOARCH=amd64 go build -gcflags "all=-N -l"  -o ../.aws-sam/build/FakeImdsRouteFunction/FakeImdsRoute .

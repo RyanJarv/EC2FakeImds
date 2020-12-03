@@ -30,9 +30,9 @@ func UnMarshallEvent(event events.CloudWatchEvent) (RunInstancesEvent) {
 }
 
 // GetAssociationId returns info about an association between a subnet and a table.
-func GetAssociationId(table *types.RouteTable, subnetId string) *types.RouteTableAssociation {
+func GetAssociationId(table *types.RouteTable, subnetId *string) *types.RouteTableAssociation {
 	for _, assoc := range table.Associations {
-		if assoc.SubnetId != nil && *assoc.SubnetId == subnetId {
+		if assoc.SubnetId != nil && *assoc.SubnetId == *subnetId {
 			return assoc
 		}
 	}
