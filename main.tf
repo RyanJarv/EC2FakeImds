@@ -40,26 +40,32 @@ resource "aws_instance" "imds_server" {
 
   key_name      = module.ssh_key_pair.key_name
 
-  provisioner "remote-exec" {
-    script = "./scripts/setup_imds_proxy.sh"
+  connection {
+    type     = "ssh"
+    user     = "ubuntu"
+    host     = self.public_ip
+    private_key = module.ssh_key_pair.private_key
+  }
 
-    connection {
-      type     = "ssh"
-      user     = "ubuntu"
-      host     = self.public_ip
-      private_key = module.ssh_key_pair.private_key
-    }
+  provisioner "remote-exec" {
+    inline = [
+      "sudo apt-get update",
+      "sudo apt-get install -y nginx",
+    ]
+  }
+
+  provisioner "file" {
+    source = "./files/nginx-imds.conf"
+    destination = "/etc/nginx/sites-enabled/default"
   }
 
   provisioner "file" {
     source = "./files/imds/"
     destination = "/var/www/imds"
+  }
 
-    connection {
-      type     = "ssh"
-      user     = "ubuntu"
-      host     = self.public_ip
-      private_key = module.ssh_key_pair.private_key
-    }
+  provisioner "remote-exec" {
+    script = "./scripts/setup_imds_proxy.sh"
   }
 }
+
