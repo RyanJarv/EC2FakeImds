@@ -15,7 +15,9 @@ Launch an instance in any zone accept the one used for the fake IMDS server (us-
 
 ## Alternatives
 
-If you are able to change instance attributes for an instance the  [UserDataSwap](https://github.com/RyanJarv/UserDataSwap) is likely a better choice. It does the same thing effectively. The main reason for this PoC is to prove you can serve your own user data with primarly NetworkAdmin permissions, without any permission's to the victim EC2 instance. There are a few other benefits to this approach as well but they are mostly outweighed by complexity of the set up (compared to [UserDataSwap](https://github.com/RyanJarv/UserDataSwap)) and the fact you need to have full permissions to at least one node in the VPC. There are likely alternaties to the last requirement, so in general I'd simply recommend monitoring for any route changes involving 169.254.169.254/32 (see the [overview](#Overview) section more info).
+If you are able to change instance attributes for an instance the  [UserDataSwap](https://github.com/RyanJarv/UserDataSwap) is likely a better choice. It does the same thing effectively. The main reason for this PoC is to prove you can serve your own user data without any permission's to the victim EC2 instance. In the future I'd like to see if I can limit permissions to only what's in AWS's network admin policy.
+
+There are a few other benefits to this approach as well but they are mostly outweighed by complexity of the set up (compared to [UserDataSwap](https://github.com/RyanJarv/UserDataSwap)) and the fact you need to have full permissions to at least one node in the VPC. There are likely alternaties to the last requirement, so in general I'd simply recommend monitoring for any route changes involving 169.254.169.254/32 (see the [overview](#Overview) section more info).
 
 ## Overview
 
@@ -32,8 +34,6 @@ Since this is still a work in progress there some glue tying a few of the things
 ### fake_imds_route
 
 SAM lambda function that runs when a the RunInstance API is called. It should be fast enough (my previous version was at least) to switch out the routes before the new instance tries to contact the fake IMDS server. We don't handle reverting since that is done through a script when served to the new instance from the fake IMDS server.
-
-WIP Note: Currently you need to update the parameters in the sam config template to the appropriate values.
 
 Originally I simply added and removed a hardcoded 169.254.169.254/32, this script attempts to work in any setup by making a back up of the route table(s) that the new instance uses as well as the fake IMDS server, attaching the former to the subnet the new instance is running in and injecting a static route of 169.254.169.254/32 pointing to the fake IMDS server.
 
@@ -85,7 +85,7 @@ The paths we need to block are mostly relate to networking, they don't seem nece
 
 All this would of course would be unacceptable in any real application.. just opening up your real IMDS to the world (or vpc in our case), but in reality an attacker isn't really going to care about that kind of thing. It's not really their data they are losing (or maybe it is now.. lol).
 
-Right now the [user data](https://github.com/RyanJarv/EC2FakeImds/blob/main/files/imds/latest/user-data) just uses the hardcoded keys, but if the instance had the right permissions we need here we could potentially just omit the creds there. The victim instance should be using the fake IMDS's instance profile at this point in the boot process (should, but haven't tested this).
+The [user data](https://github.com/RyanJarv/EC2FakeImds/blob/main/files/imds/latest/user-data) script actually just uses fake IMDS's instance profile (cred requests are proxied to the real IMDS in our nginx config).
 
 We also do some interesting stuff with iptables in the fake IMDS [startup script](https://github.com/RyanJarv/EC2FakeImds/blob/scripts/nginx-imds.conf) in order to get routing to work here. We serve traffic sent to us intended to 169.254.169.254 (remember we're behaving as the next hop in the routing table) by listening on 169.254.168.254 (third octect 168 vs 169), while still being able to use the nodes real IMDS like normal. This is essential for mocking out the parts of the IMDS service we don't care about.
 
