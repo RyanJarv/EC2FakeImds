@@ -37,9 +37,6 @@ Resources:
                   - "ec2.amazonaws.com"
                 eventName:
                   - "RunInstances"
-      Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
-        Variables:
-          FakeImdsInstanceId: !Ref FakeImdsInstanceId
 
 Outputs:
   FakeImdsRouteFunction:
