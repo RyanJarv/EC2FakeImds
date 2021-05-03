@@ -1,4 +1,6 @@
-# EC2FakeImds (WIP)
+# EC2FakeImds
+
+Note: This should no longer be possible in most AWS accounts. A few months after this talk (https://blog.ryanjarv.sh/2020/12/04/deja-vu-in-the-cloud.html), AWS rolled out a change that prevents you from overriding the 169.254.169.254/32 route if you have never used this functionality in the past.
 
 ## Warning
 Don't run this in an account you or anyone else actively uses.
